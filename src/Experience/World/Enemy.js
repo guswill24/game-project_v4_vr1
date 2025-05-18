@@ -11,7 +11,7 @@ export default class Enemy {
         this.playerRef = playerRef
         this.baseSpeed = 3.0
         this.speed = this.baseSpeed
-        this.delayActivation = 60 // por defecto activo
+        this.delayActivation = 30 // por defecto activo
 
 
 

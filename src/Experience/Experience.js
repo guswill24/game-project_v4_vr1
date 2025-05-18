@@ -68,6 +68,7 @@ export default class Experience {
       }
     })
 
+    
     // Cámara y renderer
     this.camera = new Camera(this)
     this.renderer = new Renderer(this)
@@ -159,6 +160,7 @@ export default class Experience {
       })
     }
     window.userInteracted = true
+    Howler.ctx.resume()
   }
 
   resumeAudioContext() {

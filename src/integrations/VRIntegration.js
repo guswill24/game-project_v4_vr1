@@ -23,7 +23,6 @@ export default class VRIntegration {
     this._initXR()
     this._setupDebugLog()
     this._setupControllers()
-    this._create3DLogPanel()
 
   }
 
@@ -99,6 +98,13 @@ export default class VRIntegration {
     if (session) {
       try {
         await session.end()
+        // 🧹 Eliminar panel VR si existía
+        if (this._vrConsolePlane) {
+          this.scene.remove(this._vrConsolePlane)
+          this._vrConsolePlane.geometry.dispose()
+          this._vrConsolePlane.material.dispose()
+          this._vrConsolePlane = null
+        }
       } catch (err) {
         console.error('Error al salir de VR:', err)
       }
@@ -120,6 +126,7 @@ export default class VRIntegration {
         }
 
         this.renderer.xr.setSession(newSession)
+        this._create3DLogPanel()
 
         if (this.experience?.menu?.toggleButton) {
           const button = this.experience.menu.toggleButton
@@ -291,6 +298,9 @@ export default class VRIntegration {
   }
 
   _setupDebugLog() {
+    // Evitar mostrar en modo no-VR
+    if (!this.renderer.xr.isPresenting) return;
+
     if (document.getElementById('vr-debug-log')) return;
 
     const el = document.createElement('div');
@@ -302,7 +312,7 @@ export default class VRIntegration {
     width: 90vw;
     max-height: 40vh;
     overflow-y: auto;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(196, 3, 3, 0.75);
     color: #0f0;
     font-family: monospace;
     font-size: 14px;
@@ -315,17 +325,21 @@ export default class VRIntegration {
     document.body.appendChild(el);
 
     window.vrLog = (msg) => {
-      const logBox = document.getElementById('vr-debug-log')
-      if (!logBox) return
+      const logBox = document.getElementById('vr-debug-log');
+      if (!logBox) return;
 
-      const time = new Date().toLocaleTimeString()
-      const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg
-      logBox.innerText += `[${time}] ${text}\n`
-      logBox.scrollTop = logBox.scrollHeight // scroll auto
-    }
+      const time = new Date().toLocaleTimeString();
+      const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+      logBox.innerText += `[${time}] ${text}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    };
   }
 
+
   _create3DLogPanel() {
+    // ✅ Solo mostrar en modo VR
+    if (!this.renderer.xr.isPresenting) return;
+
     const planeGeometry = new THREE.PlaneGeometry(2, 1.2)
     const canvas = document.createElement('canvas')
     canvas.width = 1024
@@ -341,7 +355,7 @@ export default class VRIntegration {
     const texture = new THREE.CanvasTexture(canvas)
     const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
     const plane = new THREE.Mesh(planeGeometry, material)
-    plane.position.set(0, 1.5, -2) // frente al usuario al inicio
+    plane.position.set(0, 1.5, -2)
 
     this.scene.add(plane)
     this._vrConsoleCanvas = canvas
@@ -367,6 +381,7 @@ export default class VRIntegration {
       texture.needsUpdate = true
     }
   }
+
 
 
 }

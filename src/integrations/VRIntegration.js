@@ -20,6 +20,9 @@ export default class VRIntegration {
 
     this._initXR()
     this._setupControllers()
+    this._setupDebugLog()
+
+
   }
 
   _initXR() {
@@ -104,7 +107,7 @@ export default class VRIntegration {
           const ctx = Howler?.ctx
           if (ctx && ctx.state === 'suspended') {
             await ctx.resume()
-            console.log('🔊 AudioContext reanudado dentro de VR')
+            vrLog('🔊 AudioContext reanudado dentro de VR')
           }
         } catch (err) {
           console.warn('⚠️ Falló al reanudar AudioContext:', err)
@@ -135,7 +138,7 @@ export default class VRIntegration {
         document.body.appendChild(overlay)
         setTimeout(() => overlay.remove(), 3000)
 
-        console.log('✅ Sesión VR iniciada correctamente')
+        vrLog('✅ Sesión VR iniciada correctamente')
       } catch (err) {
         console.error('No se pudo iniciar VR:', err)
         const msg = err.message.includes('secure')
@@ -191,54 +194,92 @@ export default class VRIntegration {
     this.updateCallback = fn
   }
 
-  _updateControllers(delta) {
-    const session = this.renderer.xr.getSession()
-    if (!session) return
+_updateControllers(delta) {
+  const session = this.renderer.xr.getSession()
+  if (!session) return
 
-    for (const source of session.inputSources) {
-      if (!source.gamepad || !source.handedness) continue
+  for (const source of session.inputSources) {
+    if (!source.gamepad || !source.handedness) continue
 
-      const gamepad = source.gamepad
-      const isPressed = gamepad.buttons[0]?.pressed
+    const gamepad = source.gamepad
 
-      if (isPressed) {
-        const dir = new THREE.Vector3(0, 0, -1)
-          .applyQuaternion(this.camera.quaternion)
-          .setY(0)
-          .normalize()
+    const btnA = gamepad.buttons[0]?.pressed    // Trigger (A)
+    const btnB = gamepad.buttons[1]?.pressed    // Botón B
+    const squeeze = gamepad.buttons[2]?.pressed // Squeeze o grip
 
-        const speed = delta * 3
+    // Movimiento con botón A (gatillo principal)
+    if (btnA) {
+      const dir = new THREE.Vector3(0, 0, -1)
+        .applyQuaternion(this.camera.quaternion)
+        .setY(0)
+        .normalize()
 
-        if (!this.arrowHelper) {
-          this.arrowHelper = new THREE.ArrowHelper(
-            dir.clone(),
-            new THREE.Vector3(0, 0, 0),
-            0.5,
-            0x00ff00
-          )
-          this.camera.add(this.arrowHelper)
-          this.arrowHelper.position.set(0, -0.2, -0.5)
-        } else {
-          this.arrowHelper.setDirection(dir.clone())
-        }
+      const speed = delta * 3
+      this.camera.position.addScaledVector(dir, speed)
 
-        this.camera.position.addScaledVector(dir, speed)
-        this._movePressedLastFrame = true
-
-        if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
-          this.lastIntersectedPrize.userData.collected = true
-          this.scene.remove(this.lastIntersectedPrize.parent)
-          console.log('🟢 Premio recogido con rayo láser VR')
-        }
+      if (!this.arrowHelper) {
+        this.arrowHelper = new THREE.ArrowHelper(dir.clone(), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff00)
+        this.camera.add(this.arrowHelper)
+        this.arrowHelper.position.set(0, -0.2, -0.5)
       } else {
-        if (this._movePressedLastFrame && this.arrowHelper) {
-          this.camera.remove(this.arrowHelper)
-          this.arrowHelper.geometry.dispose()
-          this.arrowHelper.material.dispose()
-          this.arrowHelper = null
-        }
-        this._movePressedLastFrame = false
+        this.arrowHelper.setDirection(dir.clone())
       }
+
+      vrLog('🟢 Movimiento hacia adelante con A (gatillo)')
+      this._movePressedLastFrame = true
+
+      if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
+        this.lastIntersectedPrize.userData.collected = true
+        this.scene.remove(this.lastIntersectedPrize.parent)
+        vrLog('🎁 Premio recogido con láser')
+      }
+    } else {
+      if (this._movePressedLastFrame && this.arrowHelper) {
+        this.camera.remove(this.arrowHelper)
+        this.arrowHelper.geometry.dispose()
+        this.arrowHelper.material.dispose()
+        this.arrowHelper = null
+      }
+      this._movePressedLastFrame = false
+    }
+
+    // Botón B
+    if (btnB) {
+      vrLog('🟡 Botón B presionado')
+    }
+
+    // Squeeze (Grip)
+    if (squeeze) {
+      vrLog('🔵 Squeeze presionado (Grip)')
     }
   }
+}
+
+
+  _setupDebugLog() {
+    if (window.vrLog) return // evitar duplicados
+
+    const el = document.createElement('div')
+    el.id = 'vr-debug-log'
+    el.style = `
+    position: fixed;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    color: #0f0;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    z-index: 99999;
+    max-width: 80vw;
+    white-space: pre-wrap;
+  `
+    document.body.appendChild(el)
+
+    window.vrLog = (msg) => {
+      el.innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg
+    }
+  }
+
 }

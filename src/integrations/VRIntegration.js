@@ -22,6 +22,7 @@ export default class VRIntegration {
     this._initXR()
     this._setupDebugLog()
     this._setupControllers()
+    this._create3DLogPanel()
 
   }
 
@@ -334,6 +335,48 @@ export default class VRIntegration {
     }
   }
 
+  _create3DLogPanel() {
+    const planeGeometry = new THREE.PlaneGeometry(2, 1.2)
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = 512
+    const ctx = canvas.getContext('2d')
+
+    ctx.fillStyle = 'black'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'lime'
+    ctx.font = '24px monospace'
+    ctx.fillText('🟢 Consola VR', 20, 40)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
+    const plane = new THREE.Mesh(planeGeometry, material)
+    plane.position.set(0, 1.5, -2) // frente al usuario al inicio
+
+    this.scene.add(plane)
+    this._vrConsoleCanvas = canvas
+    this._vrConsoleCtx = ctx
+    this._vrConsoleTexture = texture
+    this._vrConsolePlane = plane
+    this._vrConsoleLines = ['🟢 Consola VR']
+
+    window.vrLog = (msg) => {
+      const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg
+      this._vrConsoleLines.push(text)
+      if (this._vrConsoleLines.length > 10) this._vrConsoleLines.shift()
+
+      ctx.fillStyle = 'black'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+      ctx.fillStyle = 'lime'
+      ctx.font = '24px monospace'
+      this._vrConsoleLines.forEach((line, i) => {
+        ctx.fillText(line, 20, 40 + i * 36)
+      })
+
+      texture.needsUpdate = true
+    }
+  }
 
 
 }

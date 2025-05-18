@@ -54,4 +54,13 @@ export default class Sound {
         this.sound.stop()
         this._retryCount = 0
     }
+
+    setVolume(volume) {
+        if (this.sound && typeof this.sound.volume === 'function') {
+            this.sound.volume(volume)
+        } else {
+            console.warn('⚠️ No se pudo ajustar volumen: instancia inválida.')
+        }
+    }
+
 }

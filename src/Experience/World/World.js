@@ -103,7 +103,10 @@ export default class World {
             this.enemy?.update(delta)
 
             // 💀 Verificar si el enemigo atrapó al jugador
-            const distToEnemy = this.enemy?.body?.position?.distanceTo(this.robot.body.position)
+            const distToEnemy = (this.enemy?.body?.position && this.robot?.body?.position)
+                ? this.enemy.body.position.distanceTo(this.robot.body.position)
+                : Infinity
+
             if (distToEnemy < 1.0 && !this.defeatTriggered) {
                 this.defeatTriggered = true  // Previene múltiples disparos
 
@@ -144,13 +147,21 @@ export default class World {
 
         this.loader?.prizes?.forEach(p => p.update(delta))
 
-        if (!this.allowPrizePickup || !this.loader || !this.robot) return
+        if (!this.allowPrizePickup || !this.loader || !this.robot || !this.robot.body) return
 
-        const pos = this.experience.renderer.instance.xr.isPresenting
-            ? this.experience.camera.instance.position
-            : this.robot.body.position
 
-        const speed = this.robot.body.velocity.length()
+        let pos = null
+
+        if (this.experience.renderer.instance.xr.isPresenting) {
+            pos = this.experience.camera.instance.position
+        } else if (this.robot?.body?.position) {
+            pos = this.robot.body.position
+        } else {
+            return // No hay posición válida, salimos del update
+        }
+
+
+        const speed = this.robot?.body?.velocity?.length?.() || 0
         const moved = speed > 0.5
 
         this.loader.prizes.forEach((prize) => {

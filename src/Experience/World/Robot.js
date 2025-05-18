@@ -114,6 +114,7 @@ export default class Robot {
     }
 
     update() {
+        if (this.animation.actions.current === this.animation.actions.death) return
         const delta = this.time.delta * 0.001
         this.animation.mixer.update(delta)
 
@@ -222,5 +223,28 @@ export default class Robot {
             this.body.quaternion.setFromEuler(0, this.group.rotation.y, 0)
         }
     }
+    die() {
+        if (this.animation.actions.current !== this.animation.actions.death) {
+            this.animation.actions.current.fadeOut(0.2)
+            this.animation.actions.death.reset().fadeIn(0.2).play()
+            this.animation.actions.current = this.animation.actions.death
+
+            this.walkSound.stop()
+
+            // 💥 Eliminar cuerpo del mundo para evitar errores
+            if (this.physics.world.bodies.includes(this.body)) {
+                this.physics.world.removeBody(this.body)
+            }
+            this.body = null  // prevenir referencias rotas
+
+            // Ajustes visuales (opcional)
+            this.group.position.y -= 0.5
+            this.group.rotation.x = -Math.PI / 2
+
+            console.log('☠️ Robot ha muerto')
+        }
+    }
+
+
 
 }

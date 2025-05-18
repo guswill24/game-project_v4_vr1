@@ -202,7 +202,7 @@ export default class VRIntegration {
 
       const gamepad = source.gamepad
 
-      const btnA = gamepad.buttons[0]?.pressed    // Trigger (A)
+      const btnA = gamepad.buttons[1]?.pressed    // Trigger (A)
       const btnB = gamepad.buttons[1]?.pressed    // Botón B
       const squeeze = gamepad.buttons[2]?.pressed // Squeeze o grip
 

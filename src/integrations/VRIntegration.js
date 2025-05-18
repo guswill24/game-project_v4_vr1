@@ -233,17 +233,25 @@ export default class VRIntegration {
       if (!source.gamepad || !source.handedness) continue
 
       const gamepad = source.gamepad
-      // ⬇️ Pega el log justo aquí:
-      vrLog(`Botones: ${gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')}`);
+      const pressedStates = gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
+      vrLog(`Botones: ${pressedStates}`)
 
-      const btnA = gamepad.buttons[0]?.pressed    // Trigger (A)
-      const btnB = gamepad.buttons[1]?.pressed    // Botón B
-      const squeeze = gamepad.buttons[2]?.pressed // Squeeze o grip
+      // Detección automática del botón de movimiento
+      if (this._preferredMoveButtonIndex === undefined) {
+        for (let i = 0; i < gamepad.buttons.length; i++) {
+          if (gamepad.buttons[i].pressed) {
+            this._preferredMoveButtonIndex = i
+            vrLog(`✅ Botón #${i} asignado como botón de movimiento`)
+            break
+          }
+        }
+      }
 
-      // Movimiento con botón A (gatillo principal)
-      vrLog(`Botón A: ${gamepad.buttons[0]?.pressed}, B: ${gamepad.buttons[1]?.pressed}`);
+      const movePressed = gamepad.buttons[this._preferredMoveButtonIndex]?.pressed
+      const btnB = gamepad.buttons[1]?.pressed
+      const squeeze = gamepad.buttons[2]?.pressed
 
-      if (btnA) {
+      if (movePressed) {
         const dir = new THREE.Vector3(0, 0, -1)
           .applyQuaternion(this.camera.quaternion)
           .setY(0)
@@ -260,7 +268,6 @@ export default class VRIntegration {
           this.arrowHelper.setDirection(dir.clone())
         }
 
-        vrLog('🟢 Movimiento hacia adelante con A (gatillo)')
         this._movePressedLastFrame = true
 
         if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
@@ -278,17 +285,16 @@ export default class VRIntegration {
         this._movePressedLastFrame = false
       }
 
-      // Botón B
       if (btnB) {
         vrLog('🟡 Botón B presionado')
       }
 
-      // Squeeze (Grip)
       if (squeeze) {
         vrLog('🔵 Squeeze presionado (Grip)')
       }
     }
   }
+
 
 
   _setupDebugLog() {

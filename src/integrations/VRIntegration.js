@@ -305,31 +305,35 @@ export default class VRIntegration {
     const el = document.createElement('div');
     el.id = 'vr-debug-log';
     el.style = `
-    position: absolute;
+    position: fixed;
     top: 20px;
     left: 20px;
-    background: rgba(0, 0, 0, 0.7);
+    width: 90vw;
+    max-height: 40vh;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.75);
     color: #0f0;
     font-family: monospace;
-    font-size: 16px;
-    padding: 10px 14px;
+    font-size: 14px;
+    padding: 10px;
     border-radius: 6px;
     z-index: 999999;
     pointer-events: none;
-    max-width: 90vw;
     white-space: pre-wrap;
   `;
     document.body.appendChild(el);
 
     window.vrLog = (msg) => {
-      el.innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
-      el.style.display = 'block';
-      clearTimeout(el._hideTimeout);
-      el._hideTimeout = setTimeout(() => {
-        el.style.display = 'none';
-      }, 3000);
-    };
+      const logBox = document.getElementById('vr-debug-log')
+      if (!logBox) return
+
+      const time = new Date().toLocaleTimeString()
+      const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg
+      logBox.innerText += `[${time}] ${text}\n`
+      logBox.scrollTop = logBox.scrollHeight // scroll auto
+    }
   }
+
 
 
 }

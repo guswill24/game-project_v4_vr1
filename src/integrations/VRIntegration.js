@@ -1,5 +1,3 @@
-// src/integrations/VRIntegration.js
-
 import * as THREE from 'three'
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js'
 
@@ -16,48 +14,54 @@ export default class VRIntegration {
     this.arrowHelper = null
     this._movePressedLastFrame = false
 
+    this.raycaster = new THREE.Raycaster()
+    this.controllers = []
+    this.lastIntersectedPrize = null
+
     this._initXR()
     this._setupControllers()
   }
 
   _initXR() {
     this.renderer.xr.enabled = true
-    // Agregar botón VR de Three.js pero ocultarlo si no hay soporte
     const vrBtn = VRButton.createButton(this.renderer)
     document.body.appendChild(vrBtn)
 
-    // Esperar a que el texto se establezca (puede tardar un frame)
     setTimeout(() => {
       if (vrBtn.innerText?.includes('NOT SUPPORTED')) {
         vrBtn.style.display = 'none'
       } else {
-        // Opcional: ocultar también si tú controlas el acceso desde el menú circular
         vrBtn.style.display = 'none'
       }
     }, 100)
 
-
     this.renderer.setAnimationLoop(() => {
       const delta = this.clock.getDelta()
       this._updateControllers(delta)
+      this._updateLaserInteractions()
       if (this.updateCallback) this.updateCallback(delta)
       this.renderer.render(this.scene, this.camera)
-
     })
   }
 
   _setupControllers() {
-    this.controller1 = this.renderer.xr.getController(0)
-    this.controller2 = this.renderer.xr.getController(1)
-    this.scene.add(this.controller1, this.controller2)
+    const laserGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -1)
+    ])
+    const laserMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 })
 
-    const geo = new THREE.CylinderGeometry(0.005, 0.005, 0.1, 8)
-    const mat = new THREE.MeshStandardMaterial({ color: 0x00ffff })
-    const mesh = new THREE.Mesh(geo, mat)
-    mesh.rotation.x = -Math.PI / 2
+    for (let i = 0; i < 2; i++) {
+      const controller = this.renderer.xr.getController(i)
+      controller.userData.selectPressed = false
 
-    this.controller1.add(mesh.clone())
-    this.controller2.add(mesh.clone())
+      const laser = new THREE.Line(laserGeometry.clone(), laserMaterial)
+      laser.scale.z = 5
+      controller.add(laser)
+
+      this.scene.add(controller)
+      this.controllers.push(controller)
+    }
   }
 
   bindCharacter(character) {
@@ -108,12 +112,11 @@ export default class VRIntegration {
 
         this.renderer.xr.setSession(newSession)
 
-        // Alinear cámara con el robot
         if (this.camera && this.experience?.world?.robot?.group) {
-          const pos = this.experience.world.robot.group.position
-          this.camera.position.copy(pos).add(new THREE.Vector3(0, 1.6, 0))
-          this.camera.lookAt(pos.clone().add(new THREE.Vector3(0, 1.6, -1)))
-          console.log('🎯 Cámara realineada con el robot')
+          this.experience.world.robot.group.visible = false
+          const pos = new THREE.Vector3(5, 1.6, 5)
+          this.camera.position.copy(pos)
+          this.camera.lookAt(pos.clone().add(new THREE.Vector3(0, 0, -1)))
         }
 
         const overlay = document.createElement('div')
@@ -130,8 +133,8 @@ export default class VRIntegration {
           z-index: 99999;
         `
         document.body.appendChild(overlay)
-
         setTimeout(() => overlay.remove(), 3000)
+
         console.log('✅ Sesión VR iniciada correctamente')
       } catch (err) {
         console.error('No se pudo iniciar VR:', err)
@@ -139,6 +142,27 @@ export default class VRIntegration {
           ? 'Las sesiones VR requieren un contexto seguro (HTTPS).'
           : 'Error al iniciar VR: ' + err.message
         this._showFallback('⚠️ ' + msg)
+      }
+    }
+  }
+
+  _updateLaserInteractions() {
+    const intersectables = this.scene.children.filter(obj => obj.userData?.interactivo)
+    this.lastIntersectedPrize = null
+
+    for (const controller of this.controllers) {
+      const tempMatrix = new THREE.Matrix4().extractRotation(controller.matrixWorld)
+      const rayOrigin = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld)
+      const rayDirection = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix)
+
+      this.raycaster.set(rayOrigin, rayDirection)
+
+      const intersects = this.raycaster.intersectObjects(intersectables, true)
+
+      if (intersects.length > 0) {
+        const first = intersects[0]
+        first.object.material.emissive?.setHex(0x00ff00)
+        this.lastIntersectedPrize = first.object
       }
     }
   }
@@ -185,7 +209,6 @@ export default class VRIntegration {
 
         const speed = delta * 3
 
-        // Mostrar flecha visual
         if (!this.arrowHelper) {
           this.arrowHelper = new THREE.ArrowHelper(
             dir.clone(),
@@ -199,13 +222,14 @@ export default class VRIntegration {
           this.arrowHelper.setDirection(dir.clone())
         }
 
-        for (const c of this.characters) {
-          if (typeof c.moveInDirection === 'function') {
-            c.moveInDirection(dir, speed)
-          }
-        }
-
+        this.camera.position.addScaledVector(dir, speed)
         this._movePressedLastFrame = true
+
+        if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
+          this.lastIntersectedPrize.userData.collected = true
+          this.scene.remove(this.lastIntersectedPrize.parent)
+          console.log('🟢 Premio recogido con rayo láser VR')
+        }
       } else {
         if (this._movePressedLastFrame && this.arrowHelper) {
           this.camera.remove(this.arrowHelper)

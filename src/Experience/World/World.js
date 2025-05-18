@@ -58,6 +58,14 @@ export default class World {
                 console.error("🚫 Sistema de físicas no está inicializado al cargar el mundo.");
                 return;
             }
+
+            // Si se está en modo VR, ocultar el robot
+            if (this.experience.renderer.instance.xr.isPresenting) {
+                if (this.robot?.group) {
+                    this.robot.group.visible = false;
+                }
+            }
+
         })
     }
 
@@ -78,7 +86,10 @@ export default class World {
 
         if (!this.allowPrizePickup || !this.loader || !this.robot) return
 
-        const pos = this.robot.body.position
+        const pos = this.experience.renderer.instance.xr.isPresenting
+            ? this.experience.camera.instance.position
+            : this.robot.body.position
+
         const speed = this.robot.body.velocity.length()
         const moved = speed > 0.5
 
@@ -378,7 +389,7 @@ export default class World {
 
     }
 
-    resetRobotPosition(spawn = { x: -17, y: 1.5, z: -67}) {
+    resetRobotPosition(spawn = { x: -17, y: 1.5, z: -67 }) {
         if (!this.robot?.body || !this.robot?.group) return
 
         this.robot.body.position.set(spawn.x, spawn.y, spawn.z)

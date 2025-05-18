@@ -163,9 +163,21 @@ export default class VRIntegration {
 
       if (intersects.length > 0) {
         const first = intersects[0]
-        first.object.material.emissive?.setHex(0x00ff00)
+        const mat = first.object.material
+
+        if (Array.isArray(mat)) {
+          mat.forEach(m => {
+            if (m && m.emissive && typeof m.emissive.setHex === 'function') {
+              m.emissive.setHex(0x00ff00)
+            }
+          })
+        } else if (mat && mat.emissive && typeof mat.emissive.setHex === 'function') {
+          mat.emissive.setHex(0x00ff00)
+        }
+
         this.lastIntersectedPrize = first.object
       }
+
     }
   }
 
@@ -201,8 +213,10 @@ export default class VRIntegration {
       if (!source.gamepad || !source.handedness) continue
 
       const gamepad = source.gamepad
-
-      const btnA = gamepad.buttons[1]?.pressed    // Trigger (A)
+      // ⬇️ Pega el log justo aquí:
+      vrLog(`Botones: ${gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')}`);
+      
+      const btnA = gamepad.buttons[0]?.pressed    // Trigger (A)
       const btnB = gamepad.buttons[1]?.pressed    // Botón B
       const squeeze = gamepad.buttons[2]?.pressed // Squeeze o grip
 

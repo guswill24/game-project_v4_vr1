@@ -12,6 +12,8 @@ import MobileControls from '../../controls/MobileControls.js'
 import LevelManager from './LevelManager.js';
 import BlockPrefab from './BlockPrefab.js'
 import FinalPrizeParticles from '../Utils/FinalPrizeParticles.js'
+import Enemy from './Enemy.js'
+
 
 export default class World {
     constructor(experience) {
@@ -21,11 +23,14 @@ export default class World {
         this.resources = this.experience.resources
         this.levelManager = new LevelManager(this.experience);
         this.finalPrizeActivated = false
+        this.gameStarted = false
 
         this.coinSound = new Sound('/sounds/coin.ogg')
         this.ambientSound = new AmbientSound('/sounds/ambiente.mp3')
         this.winner = new Sound('/sounds/winner.mp3')
         this.portalSound = new Sound('/sounds/portal.mp3')
+        this.loseSound = new Sound('/sounds/lose.ogg')
+
 
         this.allowPrizePickup = false
         this.hasMoved = false
@@ -43,6 +48,21 @@ export default class World {
 
             this.fox = new Fox(this.experience)
             this.robot = new Robot(this.experience)
+
+            // Enemigo: clona un modelo o usa un cubo por ahora
+            const enemyModel = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 1, 1),
+                new THREE.MeshStandardMaterial({ color: 0xff0000 })
+            )
+
+            this.enemy = new Enemy({
+                scene: this.scene,
+                physicsWorld: this.experience.physics.world,
+                playerRef: this.robot,
+                model: enemyModel,
+                position: new THREE.Vector3(10, 1.5, 10),
+                experience: this.experience
+            })
 
             this.experience.vr.bindCharacter(this.robot)
             this.thirdPersonCamera = new ThirdPersonCamera(this.experience, this.robot.group)
@@ -78,6 +98,46 @@ export default class World {
         this.robot?.update()
         this.blockPrefab?.update()
 
+        // 🧟‍♂️ Solo actualizar enemigo si el juego ya comenzó
+        if (this.gameStarted) {
+            this.enemy?.update(delta)
+
+            // 💀 Verificar si el enemigo atrapó al jugador
+            const distToEnemy = this.enemy?.body?.position?.distanceTo(this.robot.body.position)
+            if (distToEnemy < 1.0 && !this.defeatTriggered) {
+                this.defeatTriggered = true  // Previene múltiples disparos
+
+                if (window.userInteracted && this.loseSound) {
+                    this.loseSound.play()
+                }
+
+                const enemyMesh = this.enemy.model || this.enemy.group
+                if (enemyMesh) {
+                    enemyMesh.scale.set(1.3, 1.3, 1.3)
+                    setTimeout(() => {
+                        enemyMesh.scale.set(1, 1, 1)
+                    }, 500)
+                }
+
+                this.experience.modal.show({
+                    icon: '💀',
+                    message: '¡El enemigo te atrapó!\n¿Quieres intentarlo otra vez?',
+                    buttons: [
+                        {
+                            text: '🔁 Reintentar',
+                            onClick: () => this.experience.resetGameToFirstLevel()
+                        },
+                        {
+                            text: '❌ Salir',
+                            onClick: () => this.experience.resetGame()
+                        }
+                    ]
+                })
+
+                return
+            }
+        }
+
         if (this.thirdPersonCamera && this.experience.isThirdPerson && !this.experience.renderer.instance.xr.isPresenting) {
             this.thirdPersonCamera.update()
         }
@@ -102,87 +162,74 @@ export default class World {
                 prize.collected = true
 
                 if (prize.role === "default") {
-                    this.points = (this.points || 0) + 1;
-                    this.robot.points = this.points;
+                    this.points = (this.points || 0) + 1
+                    this.robot.points = this.points
 
-                    const pointsTarget = this.levelManager.getCurrentLevelTargetPoints();
-                    console.log(`🎯 Monedas recolectadas: ${this.points} / ${pointsTarget}`);
+                    const pointsTarget = this.levelManager.getCurrentLevelTargetPoints()
+                    console.log(`🎯 Monedas recolectadas: ${this.points} / ${pointsTarget}`)
 
-                    console.log("🔍 Estado actual de prizes:")
-                    console.table(this.loader.prizes.map(p => ({
-                        role: p.role,
-                        collected: p.collected,
-                        pivot: !!p.pivot
-                    })))
-                    console.log('Negar:' + !this.finalPrizeActivated + ' Total:' + pointsTarget + ' # puntos: ' + this.points)
                     if (!this.finalPrizeActivated && this.points === pointsTarget) {
-                        const finalCoin = this.loader.prizes.find(p => p.role === "finalPrize");
+                        const finalCoin = this.loader.prizes.find(p => p.role === "finalPrize")
                         if (finalCoin && !finalCoin.collected && finalCoin.pivot) {
-                            finalCoin.pivot.visible = true;
-                            if (finalCoin.model) finalCoin.model.visible = true;
-                            this.finalPrizeActivated = true;
+                            finalCoin.pivot.visible = true
+                            if (finalCoin.model) finalCoin.model.visible = true
+                            this.finalPrizeActivated = true
 
                             new FinalPrizeParticles({
                                 scene: this.scene,
                                 targetPosition: finalCoin.pivot.position,
                                 sourcePosition: this.robot.body.position,
                                 experience: this.experience
-                            });
+                            })
 
-                            // 🌟 Efecto visual tipo faro con bajo impacto
-                            this.discoRaysGroup = new THREE.Group();
-                            this.scene.add(this.discoRaysGroup);
+                            // Faro visual
+                            this.discoRaysGroup = new THREE.Group()
+                            this.scene.add(this.discoRaysGroup)
 
                             const rayMaterial = new THREE.MeshBasicMaterial({
                                 color: 0xaa00ff,
                                 transparent: true,
                                 opacity: 0.25,
                                 side: THREE.DoubleSide
-                            });
+                            })
 
-                            const rayCount = 4; // Reducido para optimización
+                            const rayCount = 4
                             for (let i = 0; i < rayCount; i++) {
-                                const cone = new THREE.ConeGeometry(0.2, 4, 6, 1, true);
-                                const ray = new THREE.Mesh(cone, rayMaterial);
+                                const cone = new THREE.ConeGeometry(0.2, 4, 6, 1, true)
+                                const ray = new THREE.Mesh(cone, rayMaterial)
 
-                                ray.position.set(0, 2, 0);
-                                ray.rotation.x = Math.PI / 2;
-                                ray.rotation.z = (i * Math.PI * 2) / rayCount;
+                                ray.position.set(0, 2, 0)
+                                ray.rotation.x = Math.PI / 2
+                                ray.rotation.z = (i * Math.PI * 2) / rayCount
 
-                                // Luz mínima que acompaña el rayo
-                                const spot = new THREE.SpotLight(0xaa00ff, 2, 12, Math.PI / 7, 0.2, 0.5);
-                                spot.castShadow = false;
-                                spot.shadow.mapSize.set(1, 1); // Muy bajo para rendimiento
-                                spot.position.copy(ray.position);
+                                const spot = new THREE.SpotLight(0xaa00ff, 2, 12, Math.PI / 7, 0.2, 0.5)
+                                spot.castShadow = false
+                                spot.shadow.mapSize.set(1, 1)
+                                spot.position.copy(ray.position)
                                 spot.target.position.set(
                                     Math.cos(ray.rotation.z) * 10,
                                     2,
                                     Math.sin(ray.rotation.z) * 10
-                                );
+                                )
 
-                                // Agrupar
-                                ray.userData.spot = spot;
-                                this.discoRaysGroup.add(ray);
-                                this.discoRaysGroup.add(spot);
-                                this.discoRaysGroup.add(spot.target);
+                                ray.userData.spot = spot
+                                this.discoRaysGroup.add(ray)
+                                this.discoRaysGroup.add(spot)
+                                this.discoRaysGroup.add(spot.target)
                             }
 
-                            this.discoRaysGroup.position.copy(finalCoin.pivot.position);
+                            this.discoRaysGroup.position.copy(finalCoin.pivot.position)
 
                             if (window.userInteracted) {
-                                this.portalSound.play();
+                                this.portalSound.play()
                             }
 
-                            console.log("🪙 Coin final activado correctamente.");
-                        } else {
-                            console.warn("⚠️ No se pudo activar el finalPrize: falta pivot o fue recogido.");
+                            console.log("🪙 Coin final activado correctamente.")
                         }
                     }
-
                 }
 
                 if (prize.role === "finalPrize") {
-                    console.log("🚪 Coin final recogido. Pasando al siguiente nivel...")
                     if (this.levelManager.currentLevel < this.levelManager.totalLevels) {
                         this.levelManager.nextLevel()
                         this.points = 0
@@ -195,6 +242,7 @@ export default class World {
                         this.experience.obstacleWavesDisabled = true
                         clearTimeout(this.experience.obstacleWaveTimeout)
                         this.experience.raycaster?.removeAllObstacles()
+
                         if (window.userInteracted) {
                             this.winner.play()
                         }
@@ -209,19 +257,36 @@ export default class World {
                 if (window.userInteracted) {
                     this.coinSound.play()
                 }
+
                 this.experience.menu.setStatus?.(`🎖️ Puntos: ${this.points}`)
             }
         })
 
-        /**Esto es para el faro */
-        // 💡 Animación de faro del finalPrize
-        // 🎉 Animación de rayos de luz tipo discoteca
+        // Faro rotación
         if (this.discoRaysGroup) {
-            this.discoRaysGroup.rotation.y += delta * 0.5; // más suave, menos carga
+            this.discoRaysGroup.rotation.y += delta * 0.5
         }
-        /**Esto es fin del faro */
 
+        // Optimización física por distancia
+        const playerPos = this.experience.renderer.instance.xr.isPresenting
+            ? this.experience.camera.instance.position
+            : this.robot?.body?.position
+
+        this.scene.traverse((obj) => {
+            if (obj.userData?.levelObject && obj.userData.physicsBody) {
+                const dist = obj.position.distanceTo(playerPos)
+                const shouldEnable = dist < 40 && obj.visible
+
+                const body = obj.userData.physicsBody
+                if (shouldEnable && !body.enabled) {
+                    body.enabled = true
+                } else if (!shouldEnable && body.enabled) {
+                    body.enabled = false
+                }
+            }
+        })
     }
+
 
     async loadLevel(level) {
         try {

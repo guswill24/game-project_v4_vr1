@@ -312,7 +312,9 @@ export default class Experience {
       this.menu.toggleButton.style.display = 'block'
     }
 
-
+    if (this.world) {
+      this.world.gameStarted = true
+    }
     console.log('🎮 Iniciando partida...')
   }
 
@@ -357,10 +359,15 @@ export default class Experience {
   resetGameToFirstLevel() {
     console.log('♻️ Reiniciando al nivel');
 
+    // 💀 Destruir enemigo previo si existe
+    this.world.enemy?.destroy()
+    this.world.enemy = null
+
     // Resetear variables de World
     this.world.points = 0;
     this.world.robot.points = 0;
     this.world.loader.prizes = [];
+    this.world.defeatTriggered = false
 
     // Resetear nivel actual
     this.world.levelManager.currentLevel = 1;

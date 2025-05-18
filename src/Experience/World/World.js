@@ -80,11 +80,12 @@ export default class World {
             }
 
             // Si se está en modo VR, ocultar el robot
-            if (this.experience.renderer.instance.xr.isPresenting) {
-                if (this.robot?.group) {
-                    this.robot.group.visible = false;
-                }
-            }
+            this._checkVRMode()
+
+            this.experience.renderer.instance.xr.addEventListener('sessionstart', () => {
+                this._checkVRMode()
+            })
+
 
         })
     }
@@ -490,6 +491,29 @@ export default class World {
         this.totalDefaultCoins = this.loader.prizes.filter(p => p.role === "default").length;
         console.log(`🎯 Total de monedas default para el nivel local: ${this.totalDefaultCoins}`);
     }
+
+    _checkVRMode() {
+    const isVR = this.experience.renderer.instance.xr.isPresenting
+
+    if (isVR) {
+        if (this.robot?.group) {
+            this.robot.group.visible = false
+        }
+
+        // 🔁 Delay de 3s para que no ataque de inmediato en VR
+        if (this.enemy) {
+            this.enemy.delayActivation = 10.0
+        }
+
+        // 🧠 Posicionar cámara correctamente
+        this.experience.camera.instance.position.set(5, 1.6, 5)
+        this.experience.camera.instance.lookAt(new THREE.Vector3(5, 1.6, 4))
+    } else {
+        if (this.robot?.group) {
+            this.robot.group.visible = true
+        }
+    }
+}
 
 
 }

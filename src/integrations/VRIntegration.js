@@ -114,6 +114,26 @@ export default class VRIntegration {
 
         this.renderer.xr.setSession(newSession)
 
+        // 🧭 Reposicionar y mostrar el menú circular si es HTML (toggleButton)
+        if (this.experience?.menu?.toggleButton) {
+          const button = this.experience.menu.toggleButton
+          setTimeout(() => {
+            button.style.display = 'block'
+          }, 3000) // espera 3 segundos después de entrar a VR
+        }
+
+        // 🧭 Si en el futuro usas un objeto 3D en lugar de botón HTML:
+        if (this.experience?.menu?.object3D && this.camera) {
+          const menu3D = this.experience.menu.object3D
+          const camPos = this.camera.position.clone()
+          const forward = new THREE.Vector3(0, -0.2, -1).applyQuaternion(this.camera.quaternion)
+
+          menu3D.position.copy(camPos.clone().add(forward))
+          menu3D.lookAt(camPos)
+        }
+
+
+
         if (this.camera && this.experience?.world?.robot?.group) {
           this.experience.world.robot.group.visible = false
           const pos = new THREE.Vector3(5, 1.6, 5)
@@ -215,7 +235,7 @@ export default class VRIntegration {
       const gamepad = source.gamepad
       // ⬇️ Pega el log justo aquí:
       vrLog(`Botones: ${gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')}`);
-      
+
       const btnA = gamepad.buttons[0]?.pressed    // Trigger (A)
       const btnB = gamepad.buttons[1]?.pressed    // Botón B
       const squeeze = gamepad.buttons[2]?.pressed // Squeeze o grip

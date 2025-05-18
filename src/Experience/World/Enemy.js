@@ -11,6 +11,7 @@ export default class Enemy {
         this.playerRef = playerRef
         this.baseSpeed = 3.0
         this.speed = this.baseSpeed
+        this.delayActivation = 0 // por defecto activo
 
 
 
@@ -76,6 +77,11 @@ export default class Enemy {
     }
 
     update(delta) {
+        if (this.delayActivation > 0) {
+            this.delayActivation -= delta
+            return
+        }
+
         if (!this.body || !this.playerRef?.body || !this.experience?.world?.gameStarted) return
 
         const targetPos = this.playerRef.body.position

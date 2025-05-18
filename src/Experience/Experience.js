@@ -47,6 +47,27 @@ export default class Experience {
     // Recursos
     this.resources = new Resources(sources)
 
+    this.resources.on('ready', () => {
+      // Mostrar modal solo cuando los recursos estén listos
+      this.modal.show({
+        icon: '🚀',
+        message: 'Recoge todas las monedas\n¡y evita los obstáculos!',
+        buttons: [
+          {
+            text: '▶️ Iniciar juego',
+            onClick: () => this.startGame()
+          }
+        ]
+      })
+
+      // Ocultar precarga si existe
+      const overlay = document.querySelector('.loader-overlay')
+      if (overlay) {
+        overlay.classList.add('fade-out')
+        setTimeout(() => overlay.remove(), 1000)
+      }
+    })
+
     // Cámara y renderer
     this.camera = new Camera(this)
     this.renderer = new Renderer(this)
@@ -90,17 +111,7 @@ export default class Experience {
     //Generar obstaculos
     this._startObstacleWaves()
 
-    //Iniciar juego
-    this.modal.show({
-      icon: '🚀',
-      message: 'Recoge todas las monedas\n¡y evita los obstáculos!',
-      buttons: [
-        {
-          text: '▶️ Iniciar juego',
-          onClick: () => this.startGame()
-        }
-      ]
-    })
+
 
     // Activar tiempos
     if (this.tracker) {

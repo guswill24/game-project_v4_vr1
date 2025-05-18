@@ -235,25 +235,20 @@ _updateControllers(delta) {
     if (!source.gamepad || !source.handedness) continue
 
     const gamepad = source.gamepad
+    const buttons = gamepad.buttons
 
-    const pressedStates = gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
-    vrLog(`Botones: ${pressedStates}`)
+    // Log de botones en visor (se ve en la consola VR 3D también)
+    const states = buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
+    vrLog(`Botones detectados: ${states}`)
 
-    // Autodetectar botón de movimiento UNA SOLA VEZ
-    if (this._preferredMoveButtonIndex === undefined) {
-      for (let i = 0; i < gamepad.buttons.length; i++) {
-        if (gamepad.buttons[i]?.pressed) {
-          this._preferredMoveButtonIndex = i
-          vrLog(`✅ Botón #${i} asignado como botón de movimiento`)
-          break
-        }
-      }
+    // FORZAR botón de movimiento si aún no hay asignado
+    if (this._preferredMoveButtonIndex === null) {
+      // Forzamos el botón 4, ya que es el que detectaste en tu visor
+      this._preferredMoveButtonIndex = 4
+      vrLog(`✅ Botón #4 forzado como botón de movimiento (gatillo A en Meta Quest)`)
     }
 
-    const movePressed = (
-      this._preferredMoveButtonIndex !== undefined &&
-      gamepad.buttons[this._preferredMoveButtonIndex]?.pressed
-    )
+    const movePressed = buttons[this._preferredMoveButtonIndex]?.pressed
 
     if (movePressed) {
       const dir = new THREE.Vector3(0, 0, -1)
@@ -261,15 +256,15 @@ _updateControllers(delta) {
         .setY(0)
         .normalize()
 
-      const speed = delta * 3
+      const speed = delta * 2.5 // Puedes ajustar la velocidad
       this.camera.position.addScaledVector(dir, speed)
 
       if (!this.arrowHelper) {
-        this.arrowHelper = new THREE.ArrowHelper(dir.clone(), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff00)
+        this.arrowHelper = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), 0.6, 0x00ff00)
         this.camera.add(this.arrowHelper)
         this.arrowHelper.position.set(0, -0.2, -0.5)
       } else {
-        this.arrowHelper.setDirection(dir.clone())
+        this.arrowHelper.setDirection(dir)
       }
 
       this._movePressedLastFrame = true
@@ -282,9 +277,15 @@ _updateControllers(delta) {
       }
       this._movePressedLastFrame = false
     }
+
+    // Detectar láser sobre premio
+    if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
+      this.lastIntersectedPrize.userData.collected = true
+      this.scene.remove(this.lastIntersectedPrize.parent)
+      vrLog('🎁 Premio recogido con láser')
+    }
   }
 }
-
 
   _setupDebugLog() {
     if (document.getElementById('vr-debug-log')) return;

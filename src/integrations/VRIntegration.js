@@ -227,77 +227,63 @@ export default class VRIntegration {
     this.updateCallback = fn
   }
 
-  _updateControllers(delta) {
-    const session = this.renderer.xr.getSession()
-    if (!session) return
+_updateControllers(delta) {
+  const session = this.renderer.xr.getSession()
+  if (!session) return
 
-    for (const source of session.inputSources) {
-      if (!source.gamepad || !source.handedness) continue
+  for (const source of session.inputSources) {
+    if (!source.gamepad || !source.handedness) continue
 
-      const gamepad = source.gamepad
-      const pressedStates = gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
-      vrLog(`Botones: ${pressedStates}`)
+    const gamepad = source.gamepad
 
-      // Detectar automáticamente el primer botón presionado como "mover"
-      if (this._preferredMoveButtonIndex === undefined || this._preferredMoveButtonIndex === null) {
-        for (let i = 0; i < gamepad.buttons.length; i++) {
-          if (gamepad.buttons[i].pressed) {
-            this._preferredMoveButtonIndex = i
-            vrLog(`✅ Botón #${i} asignado como botón de movimiento`)
-            break
-          }
+    const pressedStates = gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
+    vrLog(`Botones: ${pressedStates}`)
+
+    // Autodetectar botón de movimiento UNA SOLA VEZ
+    if (this._preferredMoveButtonIndex === undefined) {
+      for (let i = 0; i < gamepad.buttons.length; i++) {
+        if (gamepad.buttons[i]?.pressed) {
+          this._preferredMoveButtonIndex = i
+          vrLog(`✅ Botón #${i} asignado como botón de movimiento`)
+          break
         }
       }
+    }
 
-      const movePressed =
-        this._preferredMoveButtonIndex !== null &&
-        gamepad.buttons[this._preferredMoveButtonIndex]?.pressed
+    const movePressed = (
+      this._preferredMoveButtonIndex !== undefined &&
+      gamepad.buttons[this._preferredMoveButtonIndex]?.pressed
+    )
 
-      const btnB = gamepad.buttons[1]?.pressed
-      const squeeze = gamepad.buttons[2]?.pressed
+    if (movePressed) {
+      const dir = new THREE.Vector3(0, 0, -1)
+        .applyQuaternion(this.camera.quaternion)
+        .setY(0)
+        .normalize()
 
-      // 🟢 Movimiento
-      if (movePressed) {
-        const dir = new THREE.Vector3(0, 0, -1)
-          .applyQuaternion(this.camera.quaternion)
-          .setY(0)
-          .normalize()
+      const speed = delta * 3
+      this.camera.position.addScaledVector(dir, speed)
 
-        const speed = delta * 3
-        this.camera.position.addScaledVector(dir, speed)
-
-        if (!this.arrowHelper) {
-          this.arrowHelper = new THREE.ArrowHelper(dir.clone(), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff00)
-          this.camera.add(this.arrowHelper)
-          this.arrowHelper.position.set(0, -0.2, -0.5)
-        } else {
-          this.arrowHelper.setDirection(dir.clone())
-        }
-
-        this._movePressedLastFrame = true
-
-        if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
-          this.lastIntersectedPrize.userData.collected = true
-          this.scene.remove(this.lastIntersectedPrize.parent)
-          vrLog('🎁 Premio recogido con láser')
-        }
+      if (!this.arrowHelper) {
+        this.arrowHelper = new THREE.ArrowHelper(dir.clone(), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff00)
+        this.camera.add(this.arrowHelper)
+        this.arrowHelper.position.set(0, -0.2, -0.5)
       } else {
-        if (this._movePressedLastFrame && this.arrowHelper) {
-          this.camera.remove(this.arrowHelper)
-          this.arrowHelper.geometry.dispose()
-          this.arrowHelper.material.dispose()
-          this.arrowHelper = null
-        }
-        this._movePressedLastFrame = false
+        this.arrowHelper.setDirection(dir.clone())
       }
 
-      // Otros botones (log opcional)
-      if (btnB) vrLog('🟡 Botón B presionado')
-      if (squeeze) vrLog('🔵 Squeeze presionado (Grip)')
+      this._movePressedLastFrame = true
+    } else {
+      if (this._movePressedLastFrame && this.arrowHelper) {
+        this.camera.remove(this.arrowHelper)
+        this.arrowHelper.geometry.dispose()
+        this.arrowHelper.material.dispose()
+        this.arrowHelper = null
+      }
+      this._movePressedLastFrame = false
     }
   }
-
-
+}
 
 
   _setupDebugLog() {

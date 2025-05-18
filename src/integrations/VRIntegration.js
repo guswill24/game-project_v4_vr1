@@ -71,6 +71,10 @@ export default class VRIntegration {
   }
 
   async toggleVR() {
+    if (this.experience?.world?.enemy) {
+      this.experience.world.enemy.delayActivation = 60 // ⏱️ 1 minuto para que el usuario actúe
+    }
+
     if (!navigator.xr) {
       this._showFallback('❌ WebXR no disponible en este navegador.')
       return
@@ -114,7 +118,6 @@ export default class VRIntegration {
 
         this.renderer.xr.setSession(newSession)
 
-        // 🧭 Reposicionar y mostrar el menú circular si es HTML (toggleButton)
         if (this.experience?.menu?.toggleButton) {
           const button = this.experience.menu.toggleButton
           setTimeout(() => {
@@ -122,7 +125,6 @@ export default class VRIntegration {
           }, 3000) // espera 3 segundos después de entrar a VR
         }
 
-        // 🧭 Si en el futuro usas un objeto 3D en lugar de botón HTML:
         if (this.experience?.menu?.object3D && this.camera) {
           const menu3D = this.experience.menu.object3D
           const camPos = this.camera.position.clone()
@@ -131,8 +133,6 @@ export default class VRIntegration {
           menu3D.position.copy(camPos.clone().add(forward))
           menu3D.lookAt(camPos)
         }
-
-
 
         if (this.camera && this.experience?.world?.robot?.group) {
           this.experience.world.robot.group.visible = false

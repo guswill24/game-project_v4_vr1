@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import { VRButton } from 'three/examples/jsm/webxr/VRButton.js'
 
 export default class VRIntegration {
-  constructor({ renderer, scene, camera, modalManager, experience }) {
+  constructor({ renderer, scene, camera, vrDolly, modalManager, experience }) {
+    this.vrDolly = vrDolly
     this.renderer = renderer
     this.scene = scene
     this.camera = camera
@@ -227,65 +228,67 @@ export default class VRIntegration {
     this.updateCallback = fn
   }
 
-_updateControllers(delta) {
-  const session = this.renderer.xr.getSession()
-  if (!session) return
+  _updateControllers(delta) {
+    const session = this.renderer.xr.getSession()
+    if (!session) return
 
-  for (const source of session.inputSources) {
-    if (!source.gamepad || !source.handedness) continue
+    for (const source of session.inputSources) {
+      if (!source.gamepad || !source.handedness) continue
 
-    const gamepad = source.gamepad
-    const buttons = gamepad.buttons
+      const gamepad = source.gamepad
+      const buttons = gamepad.buttons
 
-    // Log de botones en visor (se ve en la consola VR 3D también)
-    const states = buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
-    vrLog(`Botones detectados: ${states}`)
+      // Log de botones en visor (se ve en la consola VR 3D también)
+      const states = buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
+      vrLog(`Botones detectados: ${states}`)
 
-    // FORZAR botón de movimiento si aún no hay asignado
-    if (this._preferredMoveButtonIndex === null) {
-      // Forzamos el botón 4, ya que es el que detectaste en tu visor
-      this._preferredMoveButtonIndex = 4
-      vrLog(`✅ Botón #4 forzado como botón de movimiento (gatillo A en Meta Quest)`)
-    }
+      // FORZAR botón de movimiento si aún no hay asignado
+      if (this._preferredMoveButtonIndex === null) {
+        // Forzamos el botón 4, ya que es el que detectaste en tu visor
+        this._preferredMoveButtonIndex = 4
+        vrLog(`✅ Botón #4 forzado como botón de movimiento (gatillo A en Meta Quest)`)
+      }
 
-    const movePressed = buttons[this._preferredMoveButtonIndex]?.pressed
+      const movePressed = buttons[this._preferredMoveButtonIndex]?.pressed
 
-    if (movePressed) {
-      const dir = new THREE.Vector3(0, 0, -1)
-        .applyQuaternion(this.camera.quaternion)
-        .setY(0)
-        .normalize()
+      if (movePressed) {
+        const dir = new THREE.Vector3(0, 0, -1)
+          .applyQuaternion(this.camera.quaternion)
+          .setY(0)
+          .normalize()
 
-      const speed = delta * 2.5 // Puedes ajustar la velocidad
-      this.camera.position.addScaledVector(dir, speed)
+        const speed = delta * 2.5 // Puedes ajustar la velocidad
+        if (this.vrDolly) {
+          this.vrDolly.position.addScaledVector(dir, speed)
+        }
 
-      if (!this.arrowHelper) {
-        this.arrowHelper = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), 0.6, 0x00ff00)
-        this.camera.add(this.arrowHelper)
-        this.arrowHelper.position.set(0, -0.2, -0.5)
+        if (!this.arrowHelper) {
+          this.arrowHelper = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), 0.6, 0x00ff00)
+          this.camera.add(this.arrowHelper)
+          this.arrowHelper.position.set(0, -0.2, -0.5)
+        } else {
+          this.arrowHelper.setDirection(dir)
+        }
+
+        this._movePressedLastFrame = true
       } else {
-        this.arrowHelper.setDirection(dir)
+        if (this._movePressedLastFrame && this.arrowHelper) {
+          this.camera.remove(this.arrowHelper)
+          this.arrowHelper.geometry.dispose()
+          this.arrowHelper.material.dispose()
+          this.arrowHelper = null
+        }
+        this._movePressedLastFrame = false
       }
 
-      this._movePressedLastFrame = true
-    } else {
-      if (this._movePressedLastFrame && this.arrowHelper) {
-        this.camera.remove(this.arrowHelper)
-        this.arrowHelper.geometry.dispose()
-        this.arrowHelper.material.dispose()
-        this.arrowHelper = null
+      // Detectar láser sobre premio
+      if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
+        this.lastIntersectedPrize.userData.collected = true
+        this.scene.remove(this.lastIntersectedPrize.parent)
+        vrLog('🎁 Premio recogido con láser')
       }
-      this._movePressedLastFrame = false
-    }
-
-    // Detectar láser sobre premio
-    if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
-      this.lastIntersectedPrize.userData.collected = true
-      this.scene.remove(this.lastIntersectedPrize.parent)
-      vrLog('🎁 Premio recogido con láser')
     }
   }
-}
 
   _setupDebugLog() {
     if (document.getElementById('vr-debug-log')) return;

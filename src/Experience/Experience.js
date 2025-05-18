@@ -72,6 +72,13 @@ export default class Experience {
     this.camera = new Camera(this)
     this.renderer = new Renderer(this)
 
+    // 🚀 Dolly para VR movement
+    this.vrDolly = new THREE.Group()
+    this.vrDolly.name = 'VR_DOLLY'
+    this.vrDolly.add(this.camera.instance)
+    this.scene.add(this.vrDolly)
+
+
     // Socket
     //this.socketManager = new SocketManager(this)
 

@@ -19,9 +19,8 @@ export default class VRIntegration {
     this.lastIntersectedPrize = null
 
     this._initXR()
-    this._setupControllers()
     this._setupDebugLog()
-
+    this._setupControllers()
 
   }
 
@@ -194,92 +193,101 @@ export default class VRIntegration {
     this.updateCallback = fn
   }
 
-_updateControllers(delta) {
-  const session = this.renderer.xr.getSession()
-  if (!session) return
+  _updateControllers(delta) {
+    const session = this.renderer.xr.getSession()
+    if (!session) return
 
-  for (const source of session.inputSources) {
-    if (!source.gamepad || !source.handedness) continue
+    for (const source of session.inputSources) {
+      if (!source.gamepad || !source.handedness) continue
 
-    const gamepad = source.gamepad
+      const gamepad = source.gamepad
 
-    const btnA = gamepad.buttons[0]?.pressed    // Trigger (A)
-    const btnB = gamepad.buttons[1]?.pressed    // Botón B
-    const squeeze = gamepad.buttons[2]?.pressed // Squeeze o grip
+      const btnA = gamepad.buttons[0]?.pressed    // Trigger (A)
+      const btnB = gamepad.buttons[1]?.pressed    // Botón B
+      const squeeze = gamepad.buttons[2]?.pressed // Squeeze o grip
 
-    // Movimiento con botón A (gatillo principal)
-    if (btnA) {
-      const dir = new THREE.Vector3(0, 0, -1)
-        .applyQuaternion(this.camera.quaternion)
-        .setY(0)
-        .normalize()
+      // Movimiento con botón A (gatillo principal)
+      vrLog(`Botón A: ${gamepad.buttons[0]?.pressed}, B: ${gamepad.buttons[1]?.pressed}`);
 
-      const speed = delta * 3
-      this.camera.position.addScaledVector(dir, speed)
+      if (btnA) {
+        const dir = new THREE.Vector3(0, 0, -1)
+          .applyQuaternion(this.camera.quaternion)
+          .setY(0)
+          .normalize()
 
-      if (!this.arrowHelper) {
-        this.arrowHelper = new THREE.ArrowHelper(dir.clone(), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff00)
-        this.camera.add(this.arrowHelper)
-        this.arrowHelper.position.set(0, -0.2, -0.5)
+        const speed = delta * 3
+        this.camera.position.addScaledVector(dir, speed)
+
+        if (!this.arrowHelper) {
+          this.arrowHelper = new THREE.ArrowHelper(dir.clone(), new THREE.Vector3(0, 0, 0), 0.5, 0x00ff00)
+          this.camera.add(this.arrowHelper)
+          this.arrowHelper.position.set(0, -0.2, -0.5)
+        } else {
+          this.arrowHelper.setDirection(dir.clone())
+        }
+
+        vrLog('🟢 Movimiento hacia adelante con A (gatillo)')
+        this._movePressedLastFrame = true
+
+        if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
+          this.lastIntersectedPrize.userData.collected = true
+          this.scene.remove(this.lastIntersectedPrize.parent)
+          vrLog('🎁 Premio recogido con láser')
+        }
       } else {
-        this.arrowHelper.setDirection(dir.clone())
+        if (this._movePressedLastFrame && this.arrowHelper) {
+          this.camera.remove(this.arrowHelper)
+          this.arrowHelper.geometry.dispose()
+          this.arrowHelper.material.dispose()
+          this.arrowHelper = null
+        }
+        this._movePressedLastFrame = false
       }
 
-      vrLog('🟢 Movimiento hacia adelante con A (gatillo)')
-      this._movePressedLastFrame = true
-
-      if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
-        this.lastIntersectedPrize.userData.collected = true
-        this.scene.remove(this.lastIntersectedPrize.parent)
-        vrLog('🎁 Premio recogido con láser')
+      // Botón B
+      if (btnB) {
+        vrLog('🟡 Botón B presionado')
       }
-    } else {
-      if (this._movePressedLastFrame && this.arrowHelper) {
-        this.camera.remove(this.arrowHelper)
-        this.arrowHelper.geometry.dispose()
-        this.arrowHelper.material.dispose()
-        this.arrowHelper = null
+
+      // Squeeze (Grip)
+      if (squeeze) {
+        vrLog('🔵 Squeeze presionado (Grip)')
       }
-      this._movePressedLastFrame = false
-    }
-
-    // Botón B
-    if (btnB) {
-      vrLog('🟡 Botón B presionado')
-    }
-
-    // Squeeze (Grip)
-    if (squeeze) {
-      vrLog('🔵 Squeeze presionado (Grip)')
     }
   }
-}
 
 
   _setupDebugLog() {
-    if (window.vrLog) return // evitar duplicados
+    if (document.getElementById('vr-debug-log')) return;
 
-    const el = document.createElement('div')
-    el.id = 'vr-debug-log'
+    const el = document.createElement('div');
+    el.id = 'vr-debug-log';
     el.style = `
-    position: fixed;
-    bottom: 12px;
-    left: 12px;
+    position: absolute;
+    top: 20px;
+    left: 20px;
     background: rgba(0, 0, 0, 0.7);
     color: #0f0;
     font-family: monospace;
-    font-size: 14px;
-    padding: 8px 12px;
-    border-radius: 4px;
-    z-index: 99999;
-    max-width: 80vw;
+    font-size: 16px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    z-index: 999999;
+    pointer-events: none;
+    max-width: 90vw;
     white-space: pre-wrap;
-  `
-    document.body.appendChild(el)
+  `;
+    document.body.appendChild(el);
 
     window.vrLog = (msg) => {
-      el.innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg
-    }
+      el.innerText = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
+      el.style.display = 'block';
+      clearTimeout(el._hideTimeout);
+      el._hideTimeout = setTimeout(() => {
+        el.style.display = 'none';
+      }, 3000);
+    };
   }
+
 
 }

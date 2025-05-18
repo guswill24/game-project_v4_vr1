@@ -10,6 +10,7 @@ export default class VRIntegration {
     this.experience = experience
     this.characters = []
     this.clock = new THREE.Clock()
+    this._preferredMoveButtonIndex = null
 
     this.arrowHelper = null
     this._movePressedLastFrame = false
@@ -236,8 +237,8 @@ export default class VRIntegration {
       const pressedStates = gamepad.buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
       vrLog(`Botones: ${pressedStates}`)
 
-      // Detección automática del botón de movimiento
-      if (this._preferredMoveButtonIndex === undefined) {
+      // Detectar automáticamente el primer botón presionado como "mover"
+      if (this._preferredMoveButtonIndex === undefined || this._preferredMoveButtonIndex === null) {
         for (let i = 0; i < gamepad.buttons.length; i++) {
           if (gamepad.buttons[i].pressed) {
             this._preferredMoveButtonIndex = i
@@ -247,10 +248,14 @@ export default class VRIntegration {
         }
       }
 
-      const movePressed = gamepad.buttons[this._preferredMoveButtonIndex]?.pressed
+      const movePressed =
+        this._preferredMoveButtonIndex !== null &&
+        gamepad.buttons[this._preferredMoveButtonIndex]?.pressed
+
       const btnB = gamepad.buttons[1]?.pressed
       const squeeze = gamepad.buttons[2]?.pressed
 
+      // 🟢 Movimiento
       if (movePressed) {
         const dir = new THREE.Vector3(0, 0, -1)
           .applyQuaternion(this.camera.quaternion)
@@ -285,15 +290,12 @@ export default class VRIntegration {
         this._movePressedLastFrame = false
       }
 
-      if (btnB) {
-        vrLog('🟡 Botón B presionado')
-      }
-
-      if (squeeze) {
-        vrLog('🔵 Squeeze presionado (Grip)')
-      }
+      // Otros botones (log opcional)
+      if (btnB) vrLog('🟡 Botón B presionado')
+      if (squeeze) vrLog('🔵 Squeeze presionado (Grip)')
     }
   }
+
 
 
 

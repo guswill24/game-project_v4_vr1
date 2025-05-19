@@ -1,5 +1,4 @@
 import * as THREE from 'three'
-
 import Environment from './Environment.js'
 import Fox from './Fox.js'
 import Robot from './Robot.js'

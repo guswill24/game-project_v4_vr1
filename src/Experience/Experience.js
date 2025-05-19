@@ -160,7 +160,6 @@ export default class Experience {
       })
     }
     window.userInteracted = true
-    Howler.ctx.resume()
   }
 
   resumeAudioContext() {

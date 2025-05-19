@@ -28,7 +28,7 @@ export default class Renderer {
         this.instance.toneMapping = THREE.ACESFilmicToneMapping;
         this.instance.toneMappingExposure = 1.3;
         this.instance.setClearColor('#fdeac7');
-        //mountRef.current.appendChild(renderer.domElement);
+
     }
 
     resize() {

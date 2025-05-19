@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.1.2",
+    "@react-three/xr": "^6.6.17",
     "cannon-es": "^0.20.0",
     "cannon-es-debugger": "^1.0.0",
     "gsap": "^3.12.7",

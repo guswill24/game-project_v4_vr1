@@ -35,9 +35,14 @@ export default class VRIntegration {
       if (vrBtn.innerText?.includes('NOT SUPPORTED')) {
         vrBtn.style.display = 'none'
       } else {
-        vrBtn.style.display = 'none'
+        vrBtn.style.display = 'block'
+        vrBtn.style.position = 'absolute'
+        vrBtn.style.bottom = '20px'
+        vrBtn.style.left = '20px'
+        vrBtn.style.zIndex = '9999'
       }
     }, 100)
+
 
     this.renderer.setAnimationLoop(() => {
       const delta = this.clock.getDelta()

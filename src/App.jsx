@@ -1,25 +1,35 @@
-import { useEffect, useRef, useState } from 'react';
-import Experience from './Experience/Experience';
-import './styles/loader.css'; // Asegúrate de importar el CSS
+import { useEffect, useRef, useState } from 'react'
+import Experience from './Experience/Experience'
+import './styles/loader.css'
+import { Canvas } from '@react-three/fiber'
+import { Suspense } from 'react'
 
 const App = () => {
-  const canvasRef = useRef();
-  const [progress, setProgress] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const canvasWrapperRef = useRef()
+  const [progress, setProgress] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [experience, setExperience] = useState(null)
 
   useEffect(() => {
-    const experience = new Experience(canvasRef.current);
+    const handleProgress = (e) => setProgress(e.detail)
+    const handleComplete = () => setLoading(false)
 
-    // Escuchar eventos personalizados desde Resources.js
-    window.addEventListener('resource-progress', (e) => {
-      setProgress(e.detail);
-    });
+    window.addEventListener('resource-progress', handleProgress)
+    window.addEventListener('resource-complete', handleComplete)
 
-    window.addEventListener('resource-complete', () => {
-      setLoading(false);
-    });
+    return () => {
+      window.removeEventListener('resource-progress', handleProgress)
+      window.removeEventListener('resource-complete', handleComplete)
+    }
+  }, [])
 
-  }, []);
+  const handleCanvasCreated = ({ camera, gl }) => {
+    const canvasElement = canvasWrapperRef.current.querySelector('canvas')
+    const exp = new Experience(canvasElement)
+    exp.reactCamera = camera      // ✅ Pasamos la cámara de Fiber
+    exp.reactRenderer = gl        // ✅ Pasamos el renderer de Fiber
+    setExperience(exp)
+  }
 
   return (
     <>
@@ -29,9 +39,15 @@ const App = () => {
           <div id="loader-text">Cargando... {progress}%</div>
         </div>
       )}
-      <canvas ref={canvasRef} className="webgl" />
+      <div ref={canvasWrapperRef} style={{ width: '100vw', height: '100vh' }}>
+        <Canvas className="webgl" onCreated={handleCanvasCreated}>
+          <Suspense fallback={null}>
+            {experience?.VRComponent && <experience.VRComponent />}
+          </Suspense>
+        </Canvas>
+      </div>
     </>
-  );
-};
+  )
+}
 
-export default App;
+export default App

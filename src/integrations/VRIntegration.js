@@ -115,22 +115,24 @@ export default class VRIntegration {
       }
     } else {
       try {
+        console.log('[VR] Iniciando toggleVR')
         const newSession = await navigator.xr.requestSession('immersive-vr', {
           requiredFeatures: ['local-floor'],
           optionalFeatures: ['bounded-floor']
         })
-
+        console.log('[VR] requestSession OK')
         try {
-          const ctx = Howler?.ctx
-          if (ctx && ctx.state === 'suspended') {
-            await ctx.resume()
-            vrLog('🔊 AudioContext reanudado dentro de VR')
-          }
+        //  const ctx = Howler?.ctx
+        //  if (ctx && ctx.state === 'suspended') {
+        //    await ctx.resume()
+        //    vrLog('🔊 AudioContext reanudado dentro de VR')
+        //  }
         } catch (err) {
           console.warn('⚠️ Falló al reanudar AudioContext:', err)
         }
 
         this.renderer.xr.setSession(newSession)
+        console.log('[VR] setSession OK')
         this._create3DLogPanel()
 
         if (this.experience?.menu?.toggleButton) {

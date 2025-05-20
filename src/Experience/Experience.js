@@ -93,6 +93,7 @@ export default class Experience {
       renderer: this.renderer.instance,
       scene: this.scene,
       camera: this.camera.instance,
+      vrDolly: this.vrDolly,
       modalManager: this.modal,
       experience: this
     })

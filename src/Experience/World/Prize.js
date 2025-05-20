@@ -9,6 +9,9 @@ export default class Prize {
 
         this.pivot = new THREE.Group()
         this.pivot.position.copy(position)
+        this.pivot.userData.interactivo = true
+        this.pivot.userData.collected = false
+
 
         // ✅ Clonar el modelo
         this.model = model.clone()

@@ -11,7 +11,7 @@ export default class Enemy {
         this.playerRef = playerRef
         this.baseSpeed = 3.0
         this.speed = this.baseSpeed
-        this.delayActivation = 30 // por defecto activo
+        this.delayActivation = 60 // por defecto activo
 
 
 
@@ -84,13 +84,18 @@ export default class Enemy {
 
         if (!this.body || !this.playerRef?.body || !this.experience?.world?.gameStarted) return
 
-        const targetPos = this.playerRef.body.position
+        const targetPos = new CANNON.Vec3(
+            this.experience.vrDolly.position.x,
+            0,
+            this.experience.vrDolly.position.z
+        )
+
         const enemyPos = this.body.position
 
         // 🎧 Volumen según cercanía
         const distance = enemyPos.distanceTo(targetPos)
         if (distance < 4) {
-            this.speed = 5.0
+            this.speed = 2.5
         } else {
             this.speed = this.baseSpeed
         }

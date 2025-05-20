@@ -20,10 +20,13 @@ export default class VRIntegration {
     this.controllers = []
     this.lastIntersectedPrize = null
 
+    if (typeof window.vrLog !== 'function') {
+      window.vrLog = () => { }
+    }
+
     this._initXR()
     this._setupDebugLog()
     this._setupControllers()
-
   }
 
   _initXR() {
@@ -42,7 +45,6 @@ export default class VRIntegration {
         vrBtn.style.zIndex = '9999'
       }
     }, 100)
-
 
     this.renderer.setAnimationLoop(() => {
       const delta = this.clock.getDelta()
@@ -68,7 +70,7 @@ export default class VRIntegration {
       laser.scale.z = 5
       controller.add(laser)
 
-      this.scene.add(controller)
+      this.vrDolly.add(controller)
       this.controllers.push(controller)
     }
   }
@@ -79,7 +81,7 @@ export default class VRIntegration {
 
   async toggleVR() {
     if (this.experience?.world?.enemy) {
-      this.experience.world.enemy.delayActivation = 60 // ⏱️ 1 minuto para que el usuario actúe
+      this.experience.world.enemy.delayActivation = 60
     }
 
     if (!navigator.xr) {
@@ -103,7 +105,6 @@ export default class VRIntegration {
     if (session) {
       try {
         await session.end()
-        // 🧹 Eliminar panel VR si existía
         if (this._vrConsolePlane) {
           this.scene.remove(this._vrConsolePlane)
           this._vrConsolePlane.geometry.dispose()
@@ -121,12 +122,13 @@ export default class VRIntegration {
           optionalFeatures: ['bounded-floor']
         })
         console.log('[VR] requestSession OK')
+
         try {
-        //  const ctx = Howler?.ctx
-        //  if (ctx && ctx.state === 'suspended') {
-        //    await ctx.resume()
-        //    vrLog('🔊 AudioContext reanudado dentro de VR')
-        //  }
+          const ctx = window.Howler?.ctx
+          if (ctx && ctx.state === 'suspended') {
+            await ctx.resume()
+            vrLog('🔊 AudioContext reanudado dentro de VR')
+          }
         } catch (err) {
           console.warn('⚠️ Falló al reanudar AudioContext:', err)
         }
@@ -139,7 +141,7 @@ export default class VRIntegration {
           const button = this.experience.menu.toggleButton
           setTimeout(() => {
             button.style.display = 'block'
-          }, 3000) // espera 3 segundos después de entrar a VR
+          }, 3000)
         }
 
         if (this.experience?.menu?.object3D && this.camera) {
@@ -185,17 +187,109 @@ export default class VRIntegration {
     }
   }
 
+  _updateControllers(delta) {
+    const session = this.renderer.xr.getSession()
+    if (!session || !this.renderer.xr.isPresenting) return
+
+    for (const source of session.inputSources) {
+      if (!source.gamepad || !source.handedness) continue
+
+      const gamepad = source.gamepad
+      const buttons = gamepad.buttons
+
+      const states = buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
+      vrLog(`Botones detectados: ${states}`)
+
+      if (this._preferredMoveButtonIndex === null) {
+        this._preferredMoveButtonIndex = 4
+        vrLog(`✅ Botón #4 forzado como botón de movimiento (gatillo A en Meta Quest)`)
+      }
+
+      const movePressed = buttons[this._preferredMoveButtonIndex]?.pressed
+
+      if (movePressed) {
+        const dir = new THREE.Vector3(0, 0, -1)
+          .applyQuaternion(this.camera.quaternion)
+          .setY(0)
+          .normalize()
+
+        const speed = delta * 3.5
+        if (this.vrDolly) {
+          console.log('💡 Movimiento aplicado a vrDolly:', dir)
+          this.vrDolly.position.addScaledVector(dir, speed)
+        }
+
+
+        this._movePressedLastFrame = true
+      } else {
+        if (this._movePressedLastFrame && this.arrowHelper) {
+          this.camera.remove(this.arrowHelper)
+          this.arrowHelper.geometry?.dispose?.()
+          this.arrowHelper.material?.dispose?.()
+          this.arrowHelper = null
+        }
+        this._movePressedLastFrame = false
+      }
+
+      if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
+        this.lastIntersectedPrize.userData.collected = true
+        this.scene.remove(this.lastIntersectedPrize.parent)
+        vrLog('🎁 Premio recogido con láser')
+      }
+    }
+  }
+
+  _setupDebugLog() {
+    if (typeof window.vrLog !== 'function') {
+      window.vrLog = () => { }
+    }
+
+    if (!this.renderer.xr.isPresenting) return
+    if (document.getElementById('vr-debug-log')) return
+
+    const el = document.createElement('div')
+    el.id = 'vr-debug-log'
+    el.style = `
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 90vw;
+      max-height: 40vh;
+      overflow-y: auto;
+      background: rgba(196, 3, 3, 0.75);
+      color: #0f0;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 10px;
+      border-radius: 6px;
+      z-index: 999999;
+      pointer-events: none;
+      white-space: pre-wrap;
+    `
+    document.body.appendChild(el)
+
+    window.vrLog = (msg) => {
+      const logBox = document.getElementById('vr-debug-log')
+      if (!logBox) return
+
+      const time = new Date().toLocaleTimeString()
+      const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg
+      logBox.innerText += `[${time}] ${text}\n`
+      logBox.scrollTop = logBox.scrollHeight
+    }
+  }
+
   _updateLaserInteractions() {
     const intersectables = this.scene.children.filter(obj => obj.userData?.interactivo)
     this.lastIntersectedPrize = null
 
+    // 🎯 Escaneo con láser desde controladores
     for (const controller of this.controllers) {
       const tempMatrix = new THREE.Matrix4().extractRotation(controller.matrixWorld)
       const rayOrigin = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld)
       const rayDirection = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix)
 
       this.raycaster.set(rayOrigin, rayDirection)
-
       const intersects = this.raycaster.intersectObjects(intersectables, true)
 
       if (intersects.length > 0) {
@@ -203,20 +297,30 @@ export default class VRIntegration {
         const mat = first.object.material
 
         if (Array.isArray(mat)) {
-          mat.forEach(m => {
-            if (m && m.emissive && typeof m.emissive.setHex === 'function') {
-              m.emissive.setHex(0x00ff00)
-            }
-          })
-        } else if (mat && mat.emissive && typeof mat.emissive.setHex === 'function') {
-          mat.emissive.setHex(0x00ff00)
+          mat.forEach(m => m?.emissive?.setHex?.(0x00ff00))
+        } else {
+          mat?.emissive?.setHex?.(0x00ff00)
         }
 
         this.lastIntersectedPrize = first.object
       }
+    }
 
+    // 🚶‍♂️ Recolectar premios por proximidad (sin láser)
+    const playerPos = this.vrDolly?.position ?? this.camera.position
+
+    for (const obj of intersectables) {
+      const prizePos = obj.getWorldPosition?.(new THREE.Vector3()) ?? obj.position
+      const distance = playerPos.distanceTo(prizePos)
+
+      if (distance < 0.8 && !obj.userData.collected) {
+        obj.userData.collected = true
+        this.scene.remove(obj.parent ?? obj)
+        vrLog('🎁 Premio recogido por proximidad')
+      }
     }
   }
+
 
   _showFallback(text) {
     const warning = document.createElement('div')
@@ -242,110 +346,8 @@ export default class VRIntegration {
     this.updateCallback = fn
   }
 
-  _updateControllers(delta) {
-    const session = this.renderer.xr.getSession()
-    if (!session) return
-
-    for (const source of session.inputSources) {
-      if (!source.gamepad || !source.handedness) continue
-
-      const gamepad = source.gamepad
-      const buttons = gamepad.buttons
-
-      // Log de botones en visor (se ve en la consola VR 3D también)
-      const states = buttons.map((b, i) => `#${i}:${b.pressed ? '🟢' : '⚪️'}`).join(' ')
-      vrLog(`Botones detectados: ${states}`)
-
-      // FORZAR botón de movimiento si aún no hay asignado
-      if (this._preferredMoveButtonIndex === null) {
-        // Forzamos el botón 4, ya que es el que detectaste en tu visor
-        this._preferredMoveButtonIndex = 4
-        vrLog(`✅ Botón #4 forzado como botón de movimiento (gatillo A en Meta Quest)`)
-      }
-
-      const movePressed = buttons[this._preferredMoveButtonIndex]?.pressed
-
-      if (movePressed) {
-        const dir = new THREE.Vector3(0, 0, -1)
-          .applyQuaternion(this.camera.quaternion)
-          .setY(0)
-          .normalize()
-
-        const speed = delta * 2.5 // Puedes ajustar la velocidad
-        if (this.vrDolly) {
-          this.vrDolly.position.addScaledVector(dir, speed)
-        }
-
-        if (!this.arrowHelper) {
-          this.arrowHelper = new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0, 0), 0.6, 0x00ff00)
-          this.camera.add(this.arrowHelper)
-          this.arrowHelper.position.set(0, -0.2, -0.5)
-        } else {
-          this.arrowHelper.setDirection(dir)
-        }
-
-        this._movePressedLastFrame = true
-      } else {
-        if (this._movePressedLastFrame && this.arrowHelper) {
-          this.camera.remove(this.arrowHelper)
-          this.arrowHelper.geometry.dispose()
-          this.arrowHelper.material.dispose()
-          this.arrowHelper = null
-        }
-        this._movePressedLastFrame = false
-      }
-
-      // Detectar láser sobre premio
-      if (this.lastIntersectedPrize && !this.lastIntersectedPrize.userData.collected) {
-        this.lastIntersectedPrize.userData.collected = true
-        this.scene.remove(this.lastIntersectedPrize.parent)
-        vrLog('🎁 Premio recogido con láser')
-      }
-    }
-  }
-
-  _setupDebugLog() {
-    // Evitar mostrar en modo no-VR
-    if (!this.renderer.xr.isPresenting) return;
-
-    if (document.getElementById('vr-debug-log')) return;
-
-    const el = document.createElement('div');
-    el.id = 'vr-debug-log';
-    el.style = `
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    width: 90vw;
-    max-height: 40vh;
-    overflow-y: auto;
-    background: rgba(196, 3, 3, 0.75);
-    color: #0f0;
-    font-family: monospace;
-    font-size: 14px;
-    padding: 10px;
-    border-radius: 6px;
-    z-index: 999999;
-    pointer-events: none;
-    white-space: pre-wrap;
-  `;
-    document.body.appendChild(el);
-
-    window.vrLog = (msg) => {
-      const logBox = document.getElementById('vr-debug-log');
-      if (!logBox) return;
-
-      const time = new Date().toLocaleTimeString();
-      const text = typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg;
-      logBox.innerText += `[${time}] ${text}\n`;
-      logBox.scrollTop = logBox.scrollHeight;
-    };
-  }
-
-
   _create3DLogPanel() {
-    // ✅ Solo mostrar en modo VR
-    if (!this.renderer.xr.isPresenting) return;
+    if (!this.renderer.xr.isPresenting) return
 
     const planeGeometry = new THREE.PlaneGeometry(2, 1.2)
     const canvas = document.createElement('canvas')
@@ -388,7 +390,4 @@ export default class VRIntegration {
       texture.needsUpdate = true
     }
   }
-
-
-
 }
